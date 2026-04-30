@@ -1,0 +1,12 @@
+[build]
+builder = "NIXPACKS"
+
+[build.env]
+NODE_ENV = "production"
+
+[deploy]
+startCommand = "npm run start:all"
+
+[services]
+backend = { rootDir = "marilan-back", startCommand = "npm run dev" }
+frontend = { rootDir = "marilan-front", startCommand = "npm run dev" }
