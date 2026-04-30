@@ -58,6 +58,7 @@ const Maquina = {
     if (fields.nome !== undefined) updateFields.nome = fields.nome;
     if (fields.localizacao !== undefined) updateFields.localizacao = fields.localizacao;
     if (fields.descricao !== undefined) updateFields.descricao = fields.descricao;
+    if (fields.horas_funcionamento !== undefined) updateFields.horas_funcionamento = fields.horas_funcionamento;
 
     if (Object.keys(updateFields).length > 0) {
       await MaquinaModel.update(updateFields, { where: { id } });

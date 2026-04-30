@@ -1,4 +1,12 @@
+const path = require('path');
+const multer = require('multer');
 const OrdemServico = require('../models/ordemServicoModel');
+
+const storage = multer.diskStorage({
+  destination: path.join(__dirname, '..', 'uploads', 'videos'),
+  filename: (_req, file, cb) => cb(null, `video_${Date.now()}${path.extname(file.originalname)}`),
+});
+const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 } });
 
 const validPriorities = ['baixa', 'normal', 'alta'];
 const validMotivos = ['Quebra', 'Set-up', 'Troca fer.', 'Produção', 'Pequenas paradas', 'Velocidade', 'Defeito', 'Programada', 'Gestão', 'Movimento operacionais', 'Organização', 'Logística', 'Medições e ajuste'];
@@ -143,9 +151,22 @@ const ordemServicoController = {
     }
   },
 
+  async historico(req, res, next) {
+    try {
+      const currentUser = getCurrentUser(req);
+      if (!currentUser || !['admin', 'manutentor'].includes(currentUser.role)) {
+        return res.status(403).json({ error: 'Permissão insuficiente' });
+      }
+      const ordens = await OrdemServico.findHistoricoByMaquina(req.params.id);
+      res.json(ordens);
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async conclude(req, res, next) {
     try {
-      const { acao_realizada, tarefa, area, causa, observacoes, status_liberacao } = req.body;
+      const { acao_realizada, tarefa, area, causa, observacoes, status_liberacao, fim_ocorrencia, insumos } = req.body;
       if (!acao_realizada) {
         return res.status(400).json({ error: 'Campo acao_realizada é obrigatório' });
       }
@@ -166,7 +187,14 @@ const ordemServicoController = {
         return res.status(400).json({ error: 'Status de liberação inválido' });
       }
 
-      const ordem = await OrdemServico.conclude(req.params.id, { acao_realizada, tarefa, area, causa, observacoes, status_liberacao });
+      const video_url = req.file ? `/uploads/videos/${req.file.filename}` : null;
+
+      const ordem = await OrdemServico.conclude(req.params.id, {
+        acao_realizada, tarefa, area, causa, observacoes, status_liberacao,
+        hora_retorno: fim_ocorrencia || null,
+        insumos: insumos || null,
+        video_url,
+      });
       if (!ordem) {
         return res.status(400).json({ error: 'Ordem deve estar em andamento para ser concluída' });
       }
@@ -178,4 +206,5 @@ const ordemServicoController = {
   },
 };
 
+ordemServicoController.upload = upload;
 module.exports = ordemServicoController;

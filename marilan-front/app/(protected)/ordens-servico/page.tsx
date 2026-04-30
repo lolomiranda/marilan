@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -32,6 +32,10 @@ import CloseIcon from "@mui/icons-material/Close";
 import BuildIcon from "@mui/icons-material/Build";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import VideocamIcon from "@mui/icons-material/Videocam";
+import AttachFileIcon from "@mui/icons-material/AttachFile";
+import StopCircleIcon from "@mui/icons-material/StopCircle";
 
 interface Ordem {
   id: number;
@@ -187,6 +191,11 @@ const PrioridadeChip = ({ prioridade }: { prioridade: string }) => {
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,700;0,900;1,700&display=swap');
   * { box-sizing: border-box; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+  }
 
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(20px); }
@@ -372,6 +381,76 @@ export default function OrdensServicoPage() {
   const [causa, setCausa] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [statusLiberacao, setStatusLiberacao] = useState("liberada");
+  const [fimOcorrencia, setFimOcorrencia]     = useState("");
+
+  /* insumos */
+  interface Insumo { nome: string; quantidade: string; unidade: string; }
+  const [insumos, setInsumos] = useState<Insumo[]>([]);
+  const addInsumo    = () => setInsumos((p) => [...p, { nome: "", quantidade: "", unidade: "peças" }]);
+  const removeInsumo = (i: number) => setInsumos((p) => p.filter((_, idx) => idx !== i));
+  const updateInsumo = (i: number, field: keyof Insumo, value: string) =>
+    setInsumos((p) => p.map((item, idx) => idx === i ? { ...item, [field]: value } : item));
+
+  /* vídeo */
+  const [videoFile, setVideoFile]           = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [isRecording, setIsRecording]       = useState(false);
+  const [recSeconds, setRecSeconds]         = useState(0);
+  const [videoMode, setVideoMode]           = useState<"idle" | "record" | "file">("idle");
+  const mediaRecorderRef  = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const liveVideoRef      = useRef<HTMLVideoElement>(null);
+  const recTimerRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef      = useRef<HTMLInputElement>(null);
+
+  function stopAllTracks() {
+    const stream = liveVideoRef.current?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach((t) => t.stop());
+    if (liveVideoRef.current) liveVideoRef.current.srcObject = null;
+    if (recTimerRef.current) clearInterval(recTimerRef.current);
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      if (liveVideoRef.current) { liveVideoRef.current.srcObject = stream; liveVideoRef.current.play(); }
+      recordedChunksRef.current = [];
+      const rec = new MediaRecorder(stream);
+      rec.ondataavailable = (e) => { if (e.data.size > 0) recordedChunksRef.current.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+        const file = new File([blob], `gravacao_${Date.now()}.webm`, { type: "video/webm" });
+        const url  = URL.createObjectURL(blob);
+        setVideoFile(file); setVideoPreviewUrl(url);
+        stopAllTracks();
+        setIsRecording(false); setVideoMode("file");
+      };
+      rec.start();
+      mediaRecorderRef.current = rec;
+      setIsRecording(true); setRecSeconds(0); setVideoMode("record");
+      recTimerRef.current = setInterval(() => setRecSeconds((s) => s + 1), 1000);
+    } catch { alert("Não foi possível acessar a câmera/microfone."); }
+  }
+
+  function stopRecording() { mediaRecorderRef.current?.stop(); if (recTimerRef.current) clearInterval(recTimerRef.current); }
+
+  function handleVideoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoFile(file);
+    setVideoPreviewUrl(URL.createObjectURL(file));
+    setVideoMode("file");
+  }
+
+  function removeVideo() {
+    stopAllTracks();
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoFile(null); setVideoPreviewUrl(null); setVideoMode("idle"); setIsRecording(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function fmtSec(s: number) { return `${String(Math.floor(s / 60)).padStart(2,"0")}:${String(s % 60).padStart(2,"0")}`; }
 
   const [currentUser, setCurrentUser] = useState<Usuario | null>(null);
 
@@ -441,7 +520,12 @@ export default function OrdensServicoPage() {
 
   const handleOpenConclude = (ordem: Ordem) => {
     setSelectedOrdem(ordem);
-    setAcaoRealizada(""); setTarefa(""); setArea(""); setCausa(""); setObservacoes(""); setStatusLiberacao("liberada");
+    setAcaoRealizada(""); setTarefa(""); setArea(""); setCausa(""); setObservacoes(""); setStatusLiberacao("liberada"); setFimOcorrencia(getDefaultDateTimeLocal());
+    setInsumos([]);
+    stopAllTracks();
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoFile(null); setVideoPreviewUrl(null); setVideoMode("idle"); setIsRecording(false); setRecSeconds(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setOpenConclude(true);
   };
 
@@ -449,12 +533,28 @@ export default function OrdensServicoPage() {
     if (!selectedOrdem || !currentUser) return;
     setSubmitting(true);
     try {
+      const form = new FormData();
+      form.append("acao_realizada", acaoRealizada);
+      if (tarefa)    form.append("tarefa", tarefa);
+      if (area)      form.append("area", area);
+      if (causa)     form.append("causa", causa);
+      if (observacoes) form.append("observacoes", observacoes);
+      form.append("status_liberacao", statusLiberacao);
+      if (fimOcorrencia) form.append("fim_ocorrencia", fimOcorrencia);
+      form.append("insumos", JSON.stringify(insumos.filter((i) => i.nome.trim())));
+      if (videoFile) form.append("video", videoFile);
+
       const res = await fetch(`http://localhost:3001/ordens-servico/${selectedOrdem.id}/concluir`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "X-User-Id": String(currentUser.id), "X-User-Role": currentUser.role },
-        body: JSON.stringify({ acao_realizada: acaoRealizada, tarefa: tarefa || null, area: area || null, causa: causa || null, observacoes, status_liberacao: statusLiberacao }),
+        headers: { "X-User-Id": String(currentUser.id), "X-User-Role": currentUser.role },
+        body: form,
       });
-      if (res.ok) { setActionMessage("Ordem concluída com sucesso!"); setOpenConclude(false); await fetchData(); }
+      if (res.ok) {
+        setActionMessage("Ordem concluída com sucesso!");
+        setOpenConclude(false);
+        stopAllTracks();
+        await fetchData();
+      }
     } finally { setSubmitting(false); }
   };
 
@@ -514,7 +614,7 @@ export default function OrdensServicoPage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              Ordens de Serviço
+              Relatórios de Parada
             </Typography>
             <Typography
               sx={{
@@ -557,7 +657,7 @@ export default function OrdensServicoPage() {
               }}
             >
               <AddIcon sx={{ fontSize: 18 }} />
-              Abrir nova ordem
+              Formulário de parada
             </Box>
           )}
         </Box>
@@ -661,7 +761,7 @@ export default function OrdensServicoPage() {
         <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" className="marilan-dialog">
           <Box className="marilan-dialog-title">
             <BuildIcon sx={{ color: "#F97316", fontSize: 20 }} />
-            Abrir nova ordem
+            Formulário de parada
             <Box sx={{ ml: "auto" }}>
               <IconButton size="small" onClick={handleClose} sx={{ color: "#92400E" }}>
                 <CloseIcon fontSize="small" />
@@ -694,12 +794,13 @@ export default function OrdensServicoPage() {
                 <TextField label="Linha / Lote" value={linhaLote} onChange={(e) => setLinhaLote(e.target.value)} required fullWidth className="marilan-input" />
 
                 <TextField
-                  label="Data / Hora de início"
+                  label="Hora da parada *"
                   type="datetime-local"
                   value={dataAbertura}
                   onChange={(e) => setDataAbertura(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                   required fullWidth className="marilan-input"
+                  helperText="Informe o horário exato em que a máquina parou"
                 />
 
                 <FormControl fullWidth className="marilan-input">
@@ -769,7 +870,7 @@ export default function OrdensServicoPage() {
         </Dialog>
 
         {/* ════════════════ MODAL: CONCLUSÃO ════════════════ */}
-        <Dialog open={openConclude} onClose={() => setOpenConclude(false)} fullWidth maxWidth="sm" className="marilan-dialog">
+        <Dialog open={openConclude} onClose={() => { stopAllTracks(); setOpenConclude(false); }} fullWidth maxWidth="md" className="marilan-dialog">
           <Box className="marilan-dialog-title">
             <CheckCircleOutlineIcon sx={{ color: "#22C55E", fontSize: 20 }} />
             Relatório do Manutentor
@@ -814,6 +915,18 @@ export default function OrdensServicoPage() {
               </Box>
 
               <TextField label="Manutentor" value={currentUser?.nome || ""} disabled fullWidth className="marilan-input" />
+
+              <TextField
+                label="Hora de retorno (máquina voltou a funcionar) *"
+                type="datetime-local"
+                value={fimOcorrencia}
+                onChange={(e) => setFimOcorrencia(e.target.value)}
+                required
+                fullWidth
+                className="marilan-input"
+                InputLabelProps={{ shrink: true }}
+                helperText="Informe o horário em que a máquina foi religada e voltou à operação"
+              />
 
               <FormControl fullWidth className="marilan-input">
                 <InputLabel>Tarefa realizada</InputLabel>
@@ -860,6 +973,138 @@ export default function OrdensServicoPage() {
                   {statusLiberacaoOptions.map((s) => <MenuItem key={s.value} value={s.value} sx={{ fontFamily: "'Sora', sans-serif", fontSize: "0.88rem" }}>{s.label}</MenuItem>)}
                 </Select>
               </FormControl>
+
+              {/* ── Evidência em vídeo ── */}
+              <Box sx={{ border: "1.5px solid rgba(249,115,22,0.18)", borderRadius: "12px", overflow: "hidden" }}>
+                <Box sx={{ px: 2, py: 1.5, background: "#FFF9F5", borderBottom: "1px solid rgba(249,115,22,0.12)", display: "flex", alignItems: "center", gap: 1 }}>
+                  <VideocamIcon sx={{ fontSize: 16, color: "#EA6C00" }} />
+                  <Typography sx={{ fontFamily: "'Sora', sans-serif", fontSize: "0.78rem", fontWeight: 700, color: "#6B3A1F", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    Evidência em vídeo
+                  </Typography>
+                  {videoFile && (
+                    <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5, background: "#DCFCE7", borderRadius: "20px", px: 1.2, py: "2px" }}>
+                      <Box sx={{ width: 6, height: 6, borderRadius: "50%", background: "#16A34A" }} />
+                      <Typography sx={{ fontFamily: "'Sora', sans-serif", fontSize: "0.7rem", fontWeight: 600, color: "#15803D" }}>
+                        {videoFile.name.length > 24 ? videoFile.name.slice(0, 24) + "…" : videoFile.name}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+                  {/* Botões de ação */}
+                  {!isRecording && videoMode !== "file" && (
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Box
+                        component="button" type="button" onClick={startRecording}
+                        sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 1.2, border: "1.5px dashed rgba(249,115,22,0.35)", borderRadius: "10px", background: "transparent", cursor: "pointer", fontFamily: "'Sora', sans-serif", fontSize: "0.82rem", fontWeight: 600, color: "#EA6C00", transition: "background 0.15s", "&:hover": { background: "#FFF3E8" } }}
+                      >
+                        <VideocamIcon sx={{ fontSize: 17 }} /> Gravar com câmera
+                      </Box>
+                      <Box
+                        component="button" type="button" onClick={() => fileInputRef.current?.click()}
+                        sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 1, py: 1.2, border: "1.5px dashed rgba(249,115,22,0.35)", borderRadius: "10px", background: "transparent", cursor: "pointer", fontFamily: "'Sora', sans-serif", fontSize: "0.82rem", fontWeight: 600, color: "#EA6C00", transition: "background 0.15s", "&:hover": { background: "#FFF3E8" } }}
+                      >
+                        <AttachFileIcon sx={{ fontSize: 17 }} /> Anexar arquivo
+                      </Box>
+                      <input ref={fileInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={handleVideoFileChange} />
+                    </Box>
+                  )}
+
+                  {/* Gravando ao vivo */}
+                  {isRecording && (
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", animation: "pulse 1s infinite" }} />
+                          <Typography sx={{ fontFamily: "'Sora', sans-serif", fontSize: "0.82rem", fontWeight: 700, color: "#EF4444" }}>
+                            Gravando {fmtSec(recSeconds)}
+                          </Typography>
+                        </Box>
+                        <Box
+                          component="button" type="button" onClick={stopRecording}
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5, background: "#FEE2E2", border: "none", borderRadius: "8px", px: 1.5, py: 0.8, cursor: "pointer", fontFamily: "'Sora', sans-serif", fontSize: "0.8rem", fontWeight: 700, color: "#DC2626" }}
+                        >
+                          <StopCircleIcon sx={{ fontSize: 16 }} /> Parar
+                        </Box>
+                      </Box>
+                      <video ref={liveVideoRef} muted autoPlay playsInline style={{ width: "100%", borderRadius: "8px", background: "#000", maxHeight: 220, objectFit: "cover" }} />
+                    </Box>
+                  )}
+
+                  {/* Preview do vídeo gravado/anexado */}
+                  {videoMode === "file" && videoPreviewUrl && (
+                    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                      <video src={videoPreviewUrl} controls style={{ width: "100%", borderRadius: "8px", maxHeight: 220 }} />
+                      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                        <Box
+                          component="button" type="button" onClick={removeVideo}
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5, background: "#FEE2E2", border: "none", borderRadius: "8px", px: 1.5, py: 0.7, cursor: "pointer", fontFamily: "'Sora', sans-serif", fontSize: "0.78rem", fontWeight: 600, color: "#DC2626" }}
+                        >
+                          <DeleteOutlineIcon sx={{ fontSize: 15 }} /> Remover vídeo
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
+
+              {/* ── Insumos utilizados ── */}
+              <Box sx={{ border: "1.5px solid rgba(249,115,22,0.18)", borderRadius: "12px", overflow: "hidden" }}>
+                <Box sx={{ px: 2, py: 1.5, background: "#FFF9F5", borderBottom: "1px solid rgba(249,115,22,0.12)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <Typography sx={{ fontFamily: "'Sora', sans-serif", fontSize: "0.78rem", fontWeight: 700, color: "#6B3A1F", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                    Insumos utilizados
+                  </Typography>
+                  <Box
+                    component="button" type="button" onClick={addInsumo}
+                    sx={{ display: "flex", alignItems: "center", gap: 0.5, background: "linear-gradient(135deg,#F97316,#EA6C00)", border: "none", borderRadius: "8px", px: 1.5, py: 0.7, cursor: "pointer", fontFamily: "'Sora', sans-serif", fontSize: "0.78rem", fontWeight: 600, color: "#fff", boxShadow: "0 2px 8px rgba(249,115,22,0.3)" }}
+                  >
+                    <AddIcon sx={{ fontSize: 14 }} /> Adicionar
+                  </Box>
+                </Box>
+
+                <Box sx={{ p: insumos.length ? 1.5 : 2, display: "flex", flexDirection: "column", gap: 1 }}>
+                  {insumos.length === 0 ? (
+                    <Typography sx={{ fontFamily: "'Sora', sans-serif", fontSize: "0.82rem", color: "#C4956A", textAlign: "center", py: 1 }}>
+                      Nenhum insumo adicionado. Clique em "Adicionar" para incluir materiais utilizados.
+                    </Typography>
+                  ) : (
+                    insumos.map((insumo, i) => (
+                      <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1fr 90px 100px 36px", gap: 1, alignItems: "center" }}>
+                        <input
+                          placeholder="Nome do insumo"
+                          value={insumo.nome}
+                          onChange={(e) => updateInsumo(i, "nome", e.target.value)}
+                          style={{ padding: "8px 10px", border: "1.5px solid #F5CBA7", borderRadius: "8px", fontFamily: "'Sora', sans-serif", fontSize: "12px", color: "#1C0A00", background: "#FFF9F5", outline: "none" }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = "#EA6C00"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(249,115,22,0.12)"; }}
+                          onBlur={(e)  => { e.currentTarget.style.borderColor = "#F5CBA7"; e.currentTarget.style.boxShadow = "none"; }}
+                        />
+                        <input
+                          type="number" placeholder="Qtd." min="0" step="0.01"
+                          value={insumo.quantidade}
+                          onChange={(e) => updateInsumo(i, "quantidade", e.target.value)}
+                          style={{ padding: "8px 10px", border: "1.5px solid #F5CBA7", borderRadius: "8px", fontFamily: "'Sora', sans-serif", fontSize: "12px", color: "#1C0A00", background: "#FFF9F5", outline: "none", width: "100%" }}
+                          onFocus={(e) => { e.currentTarget.style.borderColor = "#EA6C00"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(249,115,22,0.12)"; }}
+                          onBlur={(e)  => { e.currentTarget.style.borderColor = "#F5CBA7"; e.currentTarget.style.boxShadow = "none"; }}
+                        />
+                        <select
+                          value={insumo.unidade}
+                          onChange={(e) => updateInsumo(i, "unidade", e.target.value)}
+                          style={{ padding: "8px 6px", border: "1.5px solid #F5CBA7", borderRadius: "8px", fontFamily: "'Sora', sans-serif", fontSize: "12px", color: "#1C0A00", background: "#FFF9F5", outline: "none", width: "100%" }}
+                        >
+                          {["peças","litros","kg","metros","unidades","par","rolo"].map((u) => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                        <Box
+                          component="button" type="button" onClick={() => removeInsumo(i)}
+                          sx={{ width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", background: "#FEE2E2", border: "none", borderRadius: "8px", cursor: "pointer", color: "#DC2626", flexShrink: 0 }}
+                        >
+                          <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                        </Box>
+                      </Box>
+                    ))
+                  )}
+                </Box>
+              </Box>
 
             </Stack>
           </DialogContent>

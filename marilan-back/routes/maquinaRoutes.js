@@ -1,9 +1,11 @@
 const express = require('express');
 const maquinaController = require('../controllers/maquinaController');
+const ordemServicoController = require('../controllers/ordemServicoController');
 
 const router = express.Router();
 
 router.get('/', maquinaController.list);
+router.get('/:id/historico', ordemServicoController.historico);
 router.post('/', maquinaController.create);
 router.patch('/:id', maquinaController.update);
 router.delete('/:id', maquinaController.delete);

@@ -84,6 +84,14 @@ const OrdemServicoModel = db.define(
       type: DataTypes.ENUM('liberada', 'nao_liberada', 'liberada_com_restricoes'),
       allowNull: true,
     },
+    insumos: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    video_url: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
   },
   {
     tableName: 'ordens_servico',
@@ -198,13 +206,29 @@ const OrdemServico = {
     return result && result.affectedRows > 0 ? this.findById(id) : null;
   },
 
-  async conclude(id, { acao_realizada, tarefa, area, causa, observacoes, status_liberacao }) {
+  async findHistoricoByMaquina(maquina_id) {
+    const rows = await db.query(
+      `SELECT o.*, m.nome AS maquina_nome, m.localizacao AS maquina_localizacao,
+        u.nome AS operador_nome, um.id AS manutentor_id, um.nome AS manutentor_nome
+      FROM ordens_servico o
+      JOIN maquinas m ON o.maquina_id = m.id
+      JOIN usuarios u ON o.operador_id = u.id
+      LEFT JOIN usuarios um ON o.manutentor_id = um.id
+      WHERE o.maquina_id = ?
+      ORDER BY o.data_abertura DESC`,
+      { replacements: [maquina_id], type: QueryTypes.SELECT }
+    );
+    return rows;
+  },
+
+  async conclude(id, { acao_realizada, tarefa, area, causa, observacoes, status_liberacao, hora_retorno, insumos, video_url }) {
+    const dataConc = hora_retorno ? new Date(hora_retorno) : new Date();
     const [result] = await db.query(
       `UPDATE ordens_servico
-      SET status = 'concluida', acao_realizada = ?, tarefa = ?, area = ?, causa = ?, observacoes = ?, status_liberacao = ?, data_conclusao = NOW()
+      SET status = 'concluida', acao_realizada = ?, tarefa = ?, area = ?, causa = ?, observacoes = ?, status_liberacao = ?, data_conclusao = ?, insumos = ?, video_url = ?
       WHERE id = ? AND status = 'em_andamento'`,
       {
-        replacements: [acao_realizada, tarefa, area, causa, observacoes || null, status_liberacao, id],
+        replacements: [acao_realizada, tarefa, area, causa, observacoes || null, status_liberacao, dataConc, insumos || null, video_url || null, id],
       }
     );
     return result && result.affectedRows > 0 ? this.findById(id) : null;

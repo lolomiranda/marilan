@@ -96,16 +96,28 @@ const dashboardController = {
          ORDER BY mttr_minutos ASC`
       );
 
-      // MTBF por Máquina (tempo médio entre falhas)
+      // MTBF por Máquina
+      // Prioridade 1: horas_funcionamento / falhas (quando cadastrado manualmente)
+      // Prioridade 2: (tempo decorrido desde 1ª parada − tempo parado total) / falhas
       const [mtbfMaquina] = await db.query(
         `SELECT m.id, m.nome, m.localizacao,
-                AVG(TIMESTAMPDIFF(HOUR, o1.data_conclusao, o2.data_abertura)) AS mtbf_horas,
-                COUNT(o1.id) AS total_paradas
+                m.horas_funcionamento,
+                COUNT(o.id) AS total_paradas,
+                CASE
+                  WHEN COUNT(o.id) > 0 AND m.horas_funcionamento IS NOT NULL AND m.horas_funcionamento > 0
+                  THEN ROUND(m.horas_funcionamento / COUNT(o.id), 2)
+                  WHEN COUNT(o.id) > 0 AND MIN(o.data_abertura) IS NOT NULL
+                  THEN ROUND(
+                    GREATEST(0,
+                      TIMESTAMPDIFF(MINUTE, MIN(o.data_abertura), NOW()) / 60
+                      - COALESCE(SUM(TIMESTAMPDIFF(MINUTE, o.data_abertura, o.data_conclusao)) / 60, 0)
+                    ) / COUNT(o.id),
+                  2)
+                  ELSE NULL
+                END AS mtbf_horas
          FROM maquinas m
-         LEFT JOIN ordens_servico o1 ON m.id = o1.maquina_id AND o1.status = 'concluida'
-         LEFT JOIN ordens_servico o2 ON m.id = o2.maquina_id AND o2.data_abertura > o1.data_conclusao
-         WHERE o1.id IS NOT NULL
-         GROUP BY m.id, m.nome, m.localizacao
+         LEFT JOIN ordens_servico o ON m.id = o.maquina_id AND o.status = 'concluida'
+         GROUP BY m.id, m.nome, m.localizacao, m.horas_funcionamento
          ORDER BY mtbf_horas DESC`
       );
 
@@ -123,15 +135,17 @@ const dashboardController = {
       const disponibilidadePercent = Math.max(0, ((totalMinutosDisponiveis - tempoParadaMinutos) / totalMinutosDisponiveis) * 100);
       const indisponibilidadePercent = Math.min(100, (tempoParadaMinutos / totalMinutosDisponiveis) * 100);
 
-      // Proporção MTBF vs MTTR
+      // Proporção MTBF vs MTTR — MTBF global = soma(horas_funcionamento) / total de falhas
       const [proporcao] = await db.query(
-        `SELECT 
-           AVG(TIMESTAMPDIFF(HOUR, o1.data_conclusao, o2.data_abertura)) AS mtbf_horas,
+        `SELECT
+           SUM(m.horas_funcionamento) / NULLIF(COUNT(o.id), 0) AS mtbf_horas,
            AVG(TIMESTAMPDIFF(MINUTE, o.data_inicio, o.data_conclusao)) AS mttr_minutos
-         FROM ordens_servico o
-         LEFT JOIN ordens_servico o1 ON o.maquina_id = o1.maquina_id AND o1.status = 'concluida'
-         LEFT JOIN ordens_servico o2 ON o.maquina_id = o2.maquina_id AND o2.data_abertura > o1.data_conclusao
-         WHERE o.status = 'concluida' AND o.data_inicio IS NOT NULL AND o.data_conclusao IS NOT NULL`
+         FROM maquinas m
+         LEFT JOIN ordens_servico o
+           ON m.id = o.maquina_id
+           AND o.status = 'concluida'
+           AND o.data_inicio IS NOT NULL
+           AND o.data_conclusao IS NOT NULL`
       );
 
       const mtbfHoras = proporcao[0]?.mtbf_horas || 0;

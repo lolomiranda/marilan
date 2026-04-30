@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
 
 interface ResumoStatus {
   status: string;
@@ -133,90 +132,6 @@ export default function DashboardPage() {
           from { width: 0%; }
           to   { width: var(--bar-w); }
         }
-
-        .db-topbar {
-          position: sticky;
-          top: 0;
-          z-index: 100;
-          background: linear-gradient(135deg, #1C0A00 0%, #3B1500 100%);
-          height: 58px;
-          padding: 0 32px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border-bottom: 1px solid rgba(249,115,22,0.18);
-          box-shadow: 0 4px 24px rgba(28,10,0,0.25);
-        }
-
-        .db-topbar-left {
-          display: flex;
-          align-items: center;
-          gap: 24px;
-        }
-
-        .db-logo {
-          font-family: 'Fraunces', serif;
-          font-size: 20px;
-          font-weight: 900;
-          color: #fff;
-          letter-spacing: -0.4px;
-          text-decoration: none;
-        }
-        .db-logo span { color: #F97316; }
-
-        .db-nav {
-          display: flex;
-          gap: 2px;
-        }
-
-        .db-nav a {
-          font-family: 'Sora', sans-serif;
-          font-size: 13px;
-          font-weight: 500;
-          color: rgba(255,255,255,0.5);
-          padding: 7px 13px;
-          border-radius: 8px;
-          text-decoration: none;
-          transition: all 0.2s;
-        }
-        .db-nav a:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.07); }
-        .db-nav a.active { color: #fff; background: rgba(249,115,22,0.22); }
-
-        .db-topbar-right {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .db-avatar {
-          width: 34px; height: 34px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #F97316, #EA6C00);
-          display: flex; align-items: center; justify-content: center;
-          font-family: 'Sora', sans-serif;
-          font-size: 12px; font-weight: 700; color: #fff;
-          box-shadow: 0 2px 10px rgba(249,115,22,0.45);
-          cursor: pointer;
-        }
-
-        .db-new-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          background: linear-gradient(135deg, #F97316, #EA6C00);
-          border: none;
-          border-radius: 9px;
-          color: #fff;
-          font-family: 'Sora', sans-serif;
-          font-size: 13px;
-          font-weight: 600;
-          padding: 8px 16px;
-          cursor: pointer;
-          text-decoration: none;
-          box-shadow: 0 3px 12px rgba(249,115,22,0.38);
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .db-new-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(249,115,22,0.45); }
 
         .db-page {
           max-width: 1200px;
@@ -522,26 +437,6 @@ export default function DashboardPage() {
         .db-setor-row:last-child { margin-bottom: 0; }
       `}</style>
 
-      {/* TOPBAR */}
-      <header className="db-topbar">
-        <div className="db-topbar-left">
-          <a href="/dashboard" className="db-logo">Mari<span>lan</span></a>
-          <nav className="db-nav">
-            <a href="/dashboard" className="active">Dashboard</a>
-            <a href="/maquinas">Máquinas</a>
-            <a href="/ordens-servico">Ordens</a>
-            <a href="/register">Usuários</a>
-          </nav>
-        </div>
-        <div className="db-topbar-right">
-          <a href="/register" className="db-new-btn">
-            <AddIcon style={{ fontSize: 15 }} />
-            Novo usuário
-          </a>
-          <div className="db-avatar">AD</div>
-        </div>
-      </header>
-
       <main className="db-page">
         <div className="db-page-header">
           <h1 className="db-page-title">Dashboard</h1>
@@ -553,7 +448,7 @@ export default function DashboardPage() {
         {/* KPIs */}
         <div className="db-kpis">
           <div className="db-kpi">
-            <div className="db-kpi-label">Ordens de Serviço</div>
+            <div className="db-kpi-label">Relatórios de Parada</div>
             <div className="db-kpi-value">{loading ? "—" : totalOrdens}</div>
             <span className="db-kpi-badge green">↑ Total</span>
             <div className="db-kpi-icon">

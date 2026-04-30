@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const usuarioRoutes = require('./routes/usuarioRoutes');
 const authRoutes = require('./routes/authRoutes');
@@ -9,6 +10,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const app = express();
 
 app.use(express.json());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');

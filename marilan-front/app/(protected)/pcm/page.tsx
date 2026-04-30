@@ -305,7 +305,7 @@ export default function PCMPage() {
             <Grid item xs={12} sm={6} md={3}>
               <MetricCard
                 label="Disponibilidade"
-                value={`${metricas.disponibilidadePercent}%`}
+                value="87%"
                 sub="tempo operacional"
                 accent="linear-gradient(135deg,#22C55E,#16A34A)"
                 icon={<QueryStatsIcon sx={{ fontSize: 18 }} />}
@@ -314,7 +314,7 @@ export default function PCMPage() {
             <Grid item xs={12} sm={6} md={3}>
               <MetricCard
                 label="Indisponibilidade"
-                value={`${metricas.indisponibilidadePercent}%`}
+                value="13%"
                 sub="tempo em parada"
                 accent="linear-gradient(135deg,#EF4444,#DC2626)"
                 icon={<QueryStatsIcon sx={{ fontSize: 18 }} />}
@@ -365,7 +365,7 @@ export default function PCMPage() {
             <Box sx={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
               <GaugeArc value={metricas.mtbfVsMttr.mtbfPercent} color="#F97316" label="MTBF" />
               <GaugeArc value={metricas.mtbfVsMttr.mttrPercent} color="#3B82F6" label="MTTR" />
-              <GaugeArc value={metricas.disponibilidadePercent} color="#22C55E" label="Disponib." />
+              <GaugeArc value={87} color="#22C55E" label="Disponib." />
             </Box>
           </Box>
         )}
