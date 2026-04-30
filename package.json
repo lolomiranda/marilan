@@ -1,0 +1,14 @@
+{
+  "name": "marilan-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "marilan-back",
+    "marilan-front"
+  ],
+  "scripts": {
+    "install:all": "npm install",
+    "start": "node start.js",
+    "dev": "node start.js"
+  }
+}
