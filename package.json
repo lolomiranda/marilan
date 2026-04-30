@@ -9,6 +9,7 @@
   "scripts": {
     "install:all": "npm install",
     "start": "node start.js",
+    "start:all": "node start.js",
     "dev": "node start.js"
   }
 }
